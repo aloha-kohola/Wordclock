@@ -21,21 +21,21 @@
 //current_time is set by sntp and increased every second by TimerCallback_1s
 static time_t current_time = 0;
 
-static xQueueHandle mainqueue;
-static xTaskHandle getSNTPTaskHandle;
-//static xTaskHandle printSNTPTaskHandle;
+static QueueHandle_t mainqueue;
+static TaskHandle_t getSNTPTaskHandle;
+//static TaskHandle_t printSNTPTaskHandle;
 
-static xSemaphoreHandle currentTimeSemaphore;
+static SemaphoreHandle_t currentTimeSemaphore;
 
 void readNTPTime(void* pvParameters)
 {
 
-    xQueueHandle* queue = (xQueueHandle*)pvParameters;
+    QueueHandle_t* queue = (QueueHandle_t*)pvParameters;
     time_t new_sntp_time = 0;
     time_t old_sntp_time = 0;
 
-    portTickType xLastWakeTime;
-    const portTickType xFrequency = (5 * 1000) / portTICK_RATE_MS;
+    TickType_t xLastWakeTime;
+    const TickType_t xFrequency = (5 * 1000) / portTICK_PERIOD_MS;
 
     //printf("%s\n", "call sntp_init()");
     sntp_init();
@@ -53,7 +53,7 @@ void readNTPTime(void* pvParameters)
         if(new_sntp_time != 0 && new_sntp_time != old_sntp_time) {
             old_sntp_time = new_sntp_time;
             if(currentTimeSemaphore != NULL) {
-                if(xSemaphoreTake(currentTimeSemaphore, 10 / portTICK_RATE_MS) == pdTRUE) {
+                if(xSemaphoreTake(currentTimeSemaphore, 10 / portTICK_PERIOD_MS) == pdTRUE) {
                     current_time = new_sntp_time;
                     //printf("Take Semaphor NTP\n");
                     xSemaphoreGive(currentTimeSemaphore);
@@ -69,27 +69,27 @@ void readNTPTime(void* pvParameters)
 
 // void printTime(void* pvParameters)
 // {
-//     xQueueHandle* queue = (xQueueHandle*)pvParameters;
+//     QueueHandle_t* queue = (QueueHandle_t*)pvParameters;
 //     time_t new_sntp_time = 0;
 
 //     while(1) {
-//         if(xQueueReceive(*queue, &new_sntp_time, 100 / portTICK_RATE_MS)) {
+//         if(xQueueReceive(*queue, &new_sntp_time, 100 / portTICK_PERIOD_MS)) {
 //             printf("Aktuelle Zeit: %s\n", ctime(&new_sntp_time));
 //         }
 //     }
 // }
 
-void TimerCallback_1s(xTimerHandle xTHandle)
+void TimerCallback_1s(TimerHandle_t xTHandle)
 {
     if(currentTimeSemaphore != NULL) {
-        if(xSemaphoreTake(currentTimeSemaphore, 100 / portTICK_RATE_MS) == pdTRUE) {
+        if(xSemaphoreTake(currentTimeSemaphore, 100 / portTICK_PERIOD_MS) == pdTRUE) {
             struct tm* tm;
             tm = localtime(&current_time);
             tm->tm_sec += 1;
             current_time = mktime(tm);
             //printf("%s\n", ctime(&current_time));
             //sdk_wifi_station_disconnect();
-            //vTaskDelay(500 / portTICK_RATE_MS);
+            //vTaskDelay(500 / portTICK_PERIOD_MS);
             wordclock_show(current_time);
             //sdk_wifi_station_connect();
             //printf("Take Semaphor Timer\n");
@@ -134,7 +134,7 @@ void user_init(void)
     //Central European Timezone + Daylight Saving
     putenv("TZ=CET-1CEST,M3.5.0/2,M10.5.0/3");
 
-    vTaskDelay((5 * 1000) / portTICK_RATE_MS);
+    vTaskDelay((5 * 1000) / portTICK_PERIOD_MS);
 
     //Initialize HTTP-Server to set colors etc.
     httpd_init_cgi_handler();
@@ -152,8 +152,8 @@ void user_init(void)
     //xTaskCreate(printTime, (signed char*)"PrintTask", 256, &mainqueue, 2, &printSNTPTaskHandle);
 
 
-    xTimerHandle Timer_1s_Handle;
-    Timer_1s_Handle = xTimerCreate("Timer_1s", (1000 / portTICK_RATE_MS), pdTRUE, NULL, TimerCallback_1s);
+    TimerHandle_t Timer_1s_Handle;
+    Timer_1s_Handle = xTimerCreate("Timer_1s", (1000 / portTICK_PERIOD_MS), pdTRUE, NULL, TimerCallback_1s);
     xTimerStart(Timer_1s_Handle, 0);
 
 }

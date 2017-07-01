@@ -8,7 +8,7 @@
 #define configTIMER_TASK_PRIORITY 5
 
 /* compatibility to old function names */
-#define configENABLE_BACKWARD_COMPATIBILITY 1
+#define configENABLE_BACKWARD_COMPATIBILITY 0
 
 /* Use the defaults for everything else */
 #include_next<FreeRTOSConfig.h>
