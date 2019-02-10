@@ -1,9 +1,10 @@
 #include "driver/ws2812b.h"
 #include "wordclock.h"
-#include "httpserver_raw/httpd.h"
-#include "httpserver_raw/httpd_callbacks.h"
 
+#include <httpd/httpd.h>
 #include <string.h>
+
+#include "httpserver_raw/httpd_callbacks.h"
 
 //CGI Handler
 static const char * HTTP_Set_FG_Color_Handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]);
