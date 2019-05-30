@@ -33,7 +33,7 @@ void readNTPTime(void* pvParameters)
         printf("%s\n", "Connecting..");
     }
 
-    char *servers[] = {SNTP_SERVERS};
+    const char *servers[] = {SNTP_SERVERS};
 
     /* SNTP will request an update each 5 minutes */
     sntp_set_update_delay(15000);
