@@ -11,6 +11,8 @@
 
 #include <httpd/httpd.h>
 
+#include <mdnsresponder.h>
+
 #include <sntp.h>
 #include <time.h>
 
@@ -32,6 +34,10 @@ void readNTPTime(void* pvParameters)
         vTaskDelayMs(1000);
         printf("%s\n", "Connecting..");
     }
+
+    /* Use mDNS to spread the name in local network */
+    mdns_init();
+    mdns_add_facility("Wordclock", "_http", NULL, mdns_TCP + mdns_Browsable, 80, 600);
 
     const char *servers[] = {SNTP_SERVERS};
 
@@ -79,7 +85,7 @@ void user_init(void)
     ws2812b_init();
     wordclock_init();
 
-    //Set Foreground Color to green
+    /* Set Foreground Color to green */
     struct rgb fg = {0x0B, 0x28, 0x0B};
     wordclock_set_fg_color(&fg);
     struct rgb bg = {0x00, 0x00, 0x00};
@@ -87,7 +93,7 @@ void user_init(void)
 
     vTaskDelay((5 * 1000) / portTICK_PERIOD_MS);
 
-    //Initialize HTTP-Server to set colors etc.
+    /* Initialize HTTP-Server to set colors etc. */
     httpd_init_cgi_handler();
     httpd_init_ssi_handler();
     httpd_init();
