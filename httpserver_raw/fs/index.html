@@ -1,7 +1,91 @@
 <html>
-<head><title>lwIP - A Lightweight TCP/IP Stack</title></head>
-<body bgcolor="white" text="black">
-    Test
+
+<head>
+
+	<title>Wordclock Configuration</title>
+	
+	<link rel="stylesheet" href="https://unpkg.com/purecss@0.6.2/build/pure-min.css" integrity="sha384-UQiGfs9ICog+LwheBSRCt1o5cbyKIHbwjWscjemyBMT9YCUMZffs6UqUTd0hObXD" crossorigin="anonymous">
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.0/spectrum.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.0/spectrum.min.css">
+
+	<style>
+		.bgcolor {
+			background: white;
+		}
+	</style>
+</head>
+<body bgcolor="#00e3d9" text="white">
+	<div class="pure-g">
+		<div class="pure-u-1-3"></div>
+		<div class="pure-u-1-3" align="center">
+			<h1 align="center">Wordclock Configuration</h1>
+			<form class="pure-form pure-form-aligned" style="margin-top:25%">
+				<fieldset>
+					<div class="pure-control-group">
+						<label>Foreground Color:</label>
+			  			<input type='text' id='foreground'/>
+					</div>
+					<div class="pure-control-group" style="margin-top:10px">
+						<label>Background Color:</label>
+			  			<input type='text' id='background'/>
+					</div>
+				</fieldset>
+			</form>
+		<div class="pure-u-1-3"></div>
+		</div>
+	</div>
+<script>
+
+$(document).ready(function() {
+	var xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+     	console.log( "ready!" );
+    }
+	};
+	xhttp.open("GET", "http://192.168.0.94/fgstatus.shtml", true);
+	xhttp.send();
+});
+
+$("#foreground").spectrum({
+    color: "#ffffff",
+    showInput: true,
+   	preferredFormat: 'hex',
+   	containerClassName: 'bgcolor',
+   	replacerClassName: 'bgcolor',
+   	change: function(color){
+   		var xhttp = new XMLHttpRequest();
+  		xhttp.onreadystatechange = function() {
+	    if (this.readyState == 4 && this.status == 200) {
+	     	
+	    }
+  		};
+  		xhttp.open("GET", "http://192.168.0.94/FG.cgi?fg=" + color.toHex(), true);
+  		xhttp.send();
+   	}
+});
+
+$("#background").spectrum({
+    color: "#ffffff",
+    showInput: true,
+   	preferredFormat: 'hex',
+   	containerClassName: 'bgcolor',
+   	replacerClassName: 'bgcolor',
+   	change:	function(color){
+   		var xhttp = new XMLHttpRequest();
+  		xhttp.onreadystatechange = function() {
+    	if (this.readyState == 4 && this.status == 200) {
+     		
+	   	}
+	  };
+	  xhttp.open("GET", "http://192.168.0.94/BG.cgi?bg=" + color.toHex(), true);
+	  xhttp.send();
+   	}
+});
+</script>
+
 </body>
 </html>
 

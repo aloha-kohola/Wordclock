@@ -1,100 +1,57 @@
 #include "espressif/esp_common.h"
 #include "esp/uart.h"
-//#include "driver/spi.h"
 #include "FreeRTOS.h"
-#include "sntp.h"
 #include "task.h"
 #include "timers.h"
 #include "semphr.h"
 #include "queue.h"
 #include "driver/ws2812b.h"
 #include "wordclock.h"
-#include "httpserver_raw/httpd.h"
 #include "httpserver_raw/httpd_callbacks.h"
+
+#include <httpd/httpd.h>
+
+#include <sntp.h>
+#include <time.h>
 
 #include <string.h>
 
-#include <time.h>
-
 #include "ssid_config.h"
 
-//current_time is set by sntp and increased every second by TimerCallback_1s
-static time_t current_time = 0;
+#define SNTP_SERVERS "0.pool.ntp.org", "1.pool.ntp.org", \
+                                    "2.pool.ntp.org", "3.pool.ntp.org"
 
-static QueueHandle_t mainqueue;
+#define vTaskDelayMs(ms) vTaskDelay((ms)/portTICK_PERIOD_MS)
+
 static TaskHandle_t getSNTPTaskHandle;
-//static TaskHandle_t printSNTPTaskHandle;
-
-static SemaphoreHandle_t currentTimeSemaphore;
 
 void readNTPTime(void* pvParameters)
 {
-
-    QueueHandle_t* queue = (QueueHandle_t*)pvParameters;
-    time_t new_sntp_time = 0;
-    time_t old_sntp_time = 0;
-
-    TickType_t xLastWakeTime;
-    const TickType_t xFrequency = (5 * 1000) / portTICK_PERIOD_MS;
-
-    //printf("%s\n", "call sntp_init()");
-    sntp_init();
-
-    xLastWakeTime = xTaskGetTickCount();
-
-    while(1) {
-
-        //sdk_wifi_set_opmode(STATION_MODE);
-        //sdk_wifi_station_connect();
-
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        new_sntp_time = sntp_gettime();
-        //printf("%i\n", (int) new_sntp_time);
-        if(new_sntp_time != 0 && new_sntp_time != old_sntp_time) {
-            old_sntp_time = new_sntp_time;
-            if(currentTimeSemaphore != NULL) {
-                if(xSemaphoreTake(currentTimeSemaphore, 10 / portTICK_PERIOD_MS) == pdTRUE) {
-                    current_time = new_sntp_time;
-                    //printf("Take Semaphor NTP\n");
-                    xSemaphoreGive(currentTimeSemaphore);
-                }
-            }
-            xQueueSend(*queue, &new_sntp_time, 0);
-        }
-
-        //sdk_wifi_station_disconnect();
-        //sdk_wifi_set_opmode(NULL_MODE);
+    /* Wait until we have joined AP and are assigned an IP */
+    while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) {
+        vTaskDelayMs(1000);
+        printf("%s\n", "Connecting..");
     }
-}
 
-// void printTime(void* pvParameters)
-// {
-//     QueueHandle_t* queue = (QueueHandle_t*)pvParameters;
-//     time_t new_sntp_time = 0;
+    char *servers[] = {SNTP_SERVERS};
 
-//     while(1) {
-//         if(xQueueReceive(*queue, &new_sntp_time, 100 / portTICK_PERIOD_MS)) {
-//             printf("Aktuelle Zeit: %s\n", ctime(&new_sntp_time));
-//         }
-//     }
-// }
+    /* SNTP will request an update each 5 minutes */
+    sntp_set_update_delay(15000);
+    /* Set GMT+1 zone, daylight savings middle european style*/
+    const struct timezone tz = {0*60, 0};
+    //Central European Timezone + Daylight Saving
+    putenv("TZ=CET-1CEST,M3.5.0/2,M10.5.0/3");
+    /* SNTP initialization */
+    sntp_initialize(&tz);
+    /* Servers must be configured right after initialization */
+    sntp_set_servers(servers, sizeof(servers) / sizeof(char*));
 
-void TimerCallback_1s(TimerHandle_t xTHandle)
-{
-    if(currentTimeSemaphore != NULL) {
-        if(xSemaphoreTake(currentTimeSemaphore, 100 / portTICK_PERIOD_MS) == pdTRUE) {
-            struct tm* tm;
-            tm = localtime(&current_time);
-            tm->tm_sec += 1;
-            current_time = mktime(tm);
-            //printf("%s\n", ctime(&current_time));
-            //sdk_wifi_station_disconnect();
-            //vTaskDelay(500 / portTICK_PERIOD_MS);
-            wordclock_show(current_time);
-            //sdk_wifi_station_connect();
-            //printf("Take Semaphor Timer\n");
-            xSemaphoreGive(currentTimeSemaphore);
-        }
+    /* Print date and time each 5 seconds */
+    while(1) {
+        vTaskDelayMs(5000);
+        time_t current_time = time(NULL);
+        //printf("TIME: %s", ctime(&current_time));
+        wordclock_show(current_time);
     }
 }
 
@@ -109,11 +66,8 @@ void user_init(void)
         .bssid_set = 0,
     };
 
-    //sdk_wifi_set_phy_mode(PHY_MODE_11B);
     sdk_wifi_set_opmode(STATION_MODE);
     sdk_wifi_station_set_config(&config);
-
-    //sdk_wifi_set_sleep_type(WIFI_SLEEP_NONE);
 
     struct ip_info info;
     info.ip.addr = ipaddr_addr("192.168.0.8");
@@ -131,9 +85,6 @@ void user_init(void)
     struct rgb bg = {0x00, 0x00, 0x00};
     wordclock_set_bg_color(&bg);
 
-    //Central European Timezone + Daylight Saving
-    putenv("TZ=CET-1CEST,M3.5.0/2,M10.5.0/3");
-
     vTaskDelay((5 * 1000) / portTICK_PERIOD_MS);
 
     //Initialize HTTP-Server to set colors etc.
@@ -141,19 +92,5 @@ void user_init(void)
     httpd_init_ssi_handler();
     httpd_init();
 
-    vSemaphoreCreateBinary(currentTimeSemaphore);
-
-    if(currentTimeSemaphore == NULL) {
-        printf("%s\n", "Error: Failed to create semaphore!");
-    }
-
-    mainqueue = xQueueCreate(1, sizeof(time_t));
-    xTaskCreate(readNTPTime, "NTPTask", 256, &mainqueue, 1, &getSNTPTaskHandle);
-    //xTaskCreate(printTime, (signed char*)"PrintTask", 256, &mainqueue, 2, &printSNTPTaskHandle);
-
-
-    TimerHandle_t Timer_1s_Handle;
-    Timer_1s_Handle = xTimerCreate("Timer_1s", (1000 / portTICK_PERIOD_MS), pdTRUE, NULL, TimerCallback_1s);
-    xTimerStart(Timer_1s_Handle, 0);
-
+    xTaskCreate(readNTPTime, "NTPTask", 1024, NULL, 1, &getSNTPTaskHandle);
 }
